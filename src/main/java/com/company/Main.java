@@ -1,9 +1,18 @@
 package com.company;
 
 import org.h2.tools.DeleteDbFiles;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.*;
 
 public class Main {
@@ -24,8 +33,55 @@ public class Main {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
+        String url = "https://en.wikipedia.org/wiki/YouTube";
+
+        Document doc = null;
+        try {
+            doc = Jsoup.connect(url).get();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (doc != null) {
+            String title = getTitle(doc);
+            String pathImg = downloadImage(doc, title);
+        }
     }
 
+    /**
+     * Parsing url and get Title of article.
+     * @param doc jsoup Document for parsing.
+     * @return title of article.
+     */
+    private static String getTitle(Document doc) {
+        Element title = doc.getElementById("firstHeading");
+        logger.info(title.text());
+        return title.text();
+    }
+
+    /**
+     * Parsing url and download article's image.
+     * @param doc - jsoup Document for parsing.
+     * @param fileName - title of article, for save file in filesystem.
+     * @return Absolute path of downloaded image.
+     */
+    private static String downloadImage(Document doc, String fileName) {
+        Element imageUrl = doc.select("#mw-content-text").first().getElementsByClass("image").first().getElementsByTag("img").first();
+        logger.info(imageUrl.absUrl("src"));
+
+        try(InputStream in = new URL(imageUrl.absUrl("src")).openStream()){
+            Path path = Paths.get(fileName + ".png");
+            if (Files.exists(path))
+                Files.deleteIfExists(path);
+            Files.copy(in, path);
+            logger.info(path.toAbsolutePath().toString());
+            return path.toAbsolutePath().toString();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     /**
      * Creating table in H2 database.

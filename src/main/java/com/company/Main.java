@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
+import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
@@ -37,26 +38,54 @@ public class Main {
             e.printStackTrace();
         }
 
-        String url = "https://en.wikipedia.org/wiki/YouTube";
-
-        Document doc = null;
-        try {
-            doc = Jsoup.connect(url).get();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        if (doc != null) {
-            String title = getTitle(doc);
-            String pathImg = downloadImage(doc, title);
-            try {
-                insertData(title, pathImg);
-                showRecordsFromDB();
-            } catch (SQLException e) {
-                e.printStackTrace();
+        while (true) {
+            showMenu();
+            Scanner scanner = new Scanner(System.in);
+            String input = scanner.nextLine();
+            if ("1".equalsIgnoreCase(input)) {
+                String url = scanner.nextLine();
+                Document doc = null;
+                try {
+                    doc = Jsoup.connect(url).get();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (IllegalArgumentException e) {
+                    logger.error("Url not valid. Please, input correct url.");
+                }
+                if (doc != null) {
+                    String title = getTitle(doc);
+                    String pathImg = downloadImage(doc, title);
+                    try {
+                        insertData(title, pathImg);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
+            if ("2".equalsIgnoreCase(input)) {
+                try {
+                    showRecordsFromDB();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if ("3".equalsIgnoreCase(input)) break;
         }
+
     }
+
+    /**
+     * Show menu.
+     */
+    private static void showMenu() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("Menu\n")
+                .append("1 - Add url of the wikipedia's article page for parsing.\n")
+                .append("2 - Show all records from db.\n")
+                .append("3 - Close application.");
+        System.out.println(stringBuilder.toString());
+    }
+
 
     /**
      * Parsing url and get Title of article.
@@ -118,16 +147,22 @@ public class Main {
      * @throws SQLException
      */
     private static void showRecordsFromDB() throws SQLException {
+        boolean empty = true;
         Connection connection = getDBConnection();
         PreparedStatement selectPreparedStatement = null;
         String SelectQuery = "select * from WIKI";
         try {
             selectPreparedStatement = connection.prepareStatement(SelectQuery);
             ResultSet rs = selectPreparedStatement.executeQuery();
+
             while (rs.next()) {
                 logger.info("Id " + rs.getInt("id") +
                         " Title " + rs.getString("title") +
                         " Path to image " + rs.getString("imgpath"));
+                empty = false;
+            }
+            if (empty) {
+                logger.info("Database is empty.");
             }
             selectPreparedStatement.close();
         }catch (SQLException e) {

@@ -14,10 +14,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
 
     private static Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private static AtomicInteger counter = new AtomicInteger(0);
 
     private static final String DB_DRIVER = "org.h2.Driver";
     private static final String DB_CONNECTION = "jdbc:h2:~/test";
@@ -46,6 +49,12 @@ public class Main {
         if (doc != null) {
             String title = getTitle(doc);
             String pathImg = downloadImage(doc, title);
+            try {
+                insertData(title, pathImg);
+                showRecordsFromDB();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -108,7 +117,7 @@ public class Main {
      * Showing all records from WIKI table.
      * @throws SQLException
      */
-    private static void showRecorsFromDB() throws SQLException {
+    private static void showRecordsFromDB() throws SQLException {
         Connection connection = getDBConnection();
         PreparedStatement selectPreparedStatement = null;
         String SelectQuery = "select * from WIKI";
@@ -131,6 +140,36 @@ public class Main {
     }
 
     /**
+     * Inserting parsed data in database.
+     * @param title - title of article.
+     * @param pathToImg - absolute path of downloaded image
+     * @throws SQLException
+     */
+    private static void insertData(String title, String pathToImg) throws SQLException {
+        Connection connection = getDBConnection();
+        PreparedStatement insertPreparedStatement = null;
+
+        String InsertQuery = "INSERT INTO WIKI" + "(id, title, imgpath) values" + "(?,?,?)";
+        try {
+            connection.setAutoCommit(false);
+            insertPreparedStatement = connection.prepareStatement(InsertQuery);
+            insertPreparedStatement.setInt(1, counter.incrementAndGet());
+            insertPreparedStatement.setString(2, title);
+            insertPreparedStatement.setString(3, pathToImg);
+            insertPreparedStatement.executeUpdate();
+            insertPreparedStatement.close();
+            connection.commit();
+            logger.info("Data saved.");
+        } catch (SQLException e) {
+            logger.error("Exception Message " + e.getLocalizedMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            connection.close();
+        }
+    }
+
+    /**
      * Getting a database connection.
      * @return dbConnection
      */
@@ -139,14 +178,14 @@ public class Main {
         try {
             Class.forName(DB_DRIVER);
         } catch (ClassNotFoundException e) {
-            logger.error(e.getMessage());
+            logger.error(e.getLocalizedMessage());
         }
         try {
             dbConnection = DriverManager.getConnection(DB_CONNECTION, DB_USER,
                     DB_PASSWORD);
             return dbConnection;
         } catch (SQLException e) {
-            logger.error(e.getMessage());
+            logger.error(e.getLocalizedMessage());
         }
         return dbConnection;
     }

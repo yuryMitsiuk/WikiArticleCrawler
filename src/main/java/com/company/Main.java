@@ -30,48 +30,61 @@ public class Main {
 
 
     public static void main(String[] args) {
+
+        Connection connection = null;
+
         try {
             // delete the H2 database named 'test' in the user home directory
             DeleteDbFiles.execute("~", "test", true);
-            createTable();
+            connection = getDBConnection();
+            createTable(connection);
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        while (true) {
-            showMenu();
-            Scanner scanner = new Scanner(System.in);
-            String input = scanner.nextLine();
-            if ("1".equalsIgnoreCase(input)) {
-                String url = scanner.nextLine();
-                Document doc = null;
-                try {
-                    doc = Jsoup.connect(url).get();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (IllegalArgumentException e) {
-                    logger.error("Url not valid. Please, input correct url.");
-                }
-                if (doc != null) {
-                    String title = getTitle(doc);
-                    String pathImg = downloadImage(doc, title);
+
+            while (true) {
+                showMenu();
+                Scanner scanner = new Scanner(System.in);
+                String input = scanner.nextLine();
+                if ("1".equalsIgnoreCase(input)) {
+                    String url = scanner.nextLine();
+                    Document doc = null;
                     try {
-                        insertData(title, pathImg);
+                        doc = Jsoup.connect(url).get();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (IllegalArgumentException e) {
+                        logger.error("Url not valid. Please, input correct url.");
+                    }
+                    if (doc != null) {
+                        String title = getTitle(doc);
+                        String pathImg = downloadImage(doc, title);
+                        try {
+                            insertData(connection, title, pathImg);
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                if ("2".equalsIgnoreCase(input)) {
+                    try {
+                        showRecordsFromDB(connection);
                     } catch (SQLException e) {
                         e.printStackTrace();
                     }
                 }
+                if ("3".equalsIgnoreCase(input)) break;
             }
-            if ("2".equalsIgnoreCase(input)) {
-                try {
-                    showRecordsFromDB();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
-            if ("3".equalsIgnoreCase(input)) break;
-        }
 
+        if (connection != null) {
+            try {
+                connection.close();
+                logger.info("Connection closed.");
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -125,8 +138,7 @@ public class Main {
      * Creating table in H2 database.
      * @throws SQLException
      */
-    private static void createTable() throws SQLException {
-        Connection connection = getDBConnection();
+    private static void createTable(Connection connection) throws SQLException {
         PreparedStatement createPreparedStatement = null;
         String CreateQuery = "CREATE TABLE WIKI(id int primary key, title varchar(255), imgpath varchar(255))";
         try {
@@ -137,8 +149,6 @@ public class Main {
             logger.error("Exception Message " + e.getLocalizedMessage());
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            connection.close();
         }
     }
 
@@ -146,9 +156,8 @@ public class Main {
      * Showing all records from WIKI table.
      * @throws SQLException
      */
-    private static void showRecordsFromDB() throws SQLException {
+    private static void showRecordsFromDB(Connection connection) throws SQLException {
         boolean empty = true;
-        Connection connection = getDBConnection();
         PreparedStatement selectPreparedStatement = null;
         String SelectQuery = "select * from WIKI";
         try {
@@ -169,8 +178,6 @@ public class Main {
             logger.error("Exception Message " + e.getLocalizedMessage());
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            connection.close();
         }
     }
 
@@ -180,8 +187,7 @@ public class Main {
      * @param pathToImg - absolute path of downloaded image
      * @throws SQLException
      */
-    private static void insertData(String title, String pathToImg) throws SQLException {
-        Connection connection = getDBConnection();
+    private static void insertData(Connection connection, String title, String pathToImg) throws SQLException {
         PreparedStatement insertPreparedStatement = null;
 
         String InsertQuery = "INSERT INTO WIKI" + "(id, title, imgpath) values" + "(?,?,?)";
@@ -199,8 +205,6 @@ public class Main {
             logger.error("Exception Message " + e.getLocalizedMessage());
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            connection.close();
         }
     }
 
